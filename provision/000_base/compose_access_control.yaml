@@ -5,9 +5,13 @@ allow:
 
     corteza::compose:namespace/*:
       - read
+      - module.search
+      - chart.search
+      - page.search
 
     corteza::compose:module/*/*:
       - read
+      - record.search
 
     corteza::compose:page/*/*:
       - read
