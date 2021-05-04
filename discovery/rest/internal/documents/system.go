@@ -13,7 +13,7 @@ type (
 		settings *types.AppSettings
 
 		rbac interface {
-			SignificantRoles(res rbac.Resource, op rbac.Operation) (aRR, dRR []uint64)
+			SignificantRoles(res rbac.Resource, op string) (aRR, dRR []uint64)
 		}
 
 		ac interface {
