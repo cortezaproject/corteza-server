@@ -1,0 +1,128 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - '**'
+  pull_request:
+    branches:
+      - '**'
+
+
+jobs:
+
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+
+      - name: Checkout Code
+        uses: actions/checkout@v2
+
+      - name: Checks
+        run: ./checks.sh
+
+
+  test_unit:
+    runs-on: ubuntu-latest
+    needs:
+      - checks
+    steps:
+
+      - name: Checkout Code
+        uses: actions/checkout@v2
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v1
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Run Unit Tests
+        run: |
+          docker run --workdir=/corteza \
+                     -v $PWD:/corteza \
+                     golang:1.16-buster make test.unit TEST_FLAGS="-mod=readonly -cover"
+
+
+  test_integration:
+    runs-on: ubuntu-latest
+    needs:
+      - checks
+    steps:
+
+      - name: Checkout Code
+        uses: actions/checkout@v2
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v1
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Run Integration Tests
+        run: |
+          docker run --workdir=/corteza \
+                     -v $PWD:/corteza \
+                     golang:1.16-buster make test.integration TEST_FLAGS="-mod=readonly -cover"
+
+
+  test_store:
+    runs-on: ubuntu-latest
+    needs:
+      - checks
+    steps:
+
+      - name: Checkout Code
+        uses: actions/checkout@v2
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v1
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Run Store Tests
+        run: |
+          docker run --workdir=/corteza \
+                     -v $PWD:/corteza \
+                     -e RDBMS_SQLITE_DSN="sqlite3://file::memory:?cache=shared&mode=memory" \
+                     golang:1.16-buster make test.store TEST_FLAGS="-mod=readonly -cover"
+
+
+  build_binary:
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/heads/')
+    needs:
+      - test_unit
+      - test_integration
+      - test_store
+    steps:
+
+      - name: Checkout Code
+        uses: actions/checkout@v2
+
+
+  build_rpm:
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/heads/')
+    needs:
+      - test_unit
+      - test_integration
+      - test_store
+    steps:
+
+      - name: Checkout Code
+        uses: actions/checkout@v2
+
+
+  build_docker:
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/heads/')
+    needs:
+      - test_unit
+      - test_integration
+      - test_store
+    steps:
+
+      - name: Checkout Code
+        uses: actions/checkout@v2

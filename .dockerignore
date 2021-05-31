@@ -1,4 +1,7 @@
-.idea
-build
-codegen
-var
+/.dev*
+/.idea
+/.git*
+/build
+/var
+/Dockerfile
+/webapp

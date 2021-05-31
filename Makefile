@@ -1,50 +1,5 @@
-.PHONY: pack build help qa critic vet codegen provision docs build auth webapp
-
 include Makefile.inc
 
-BUILD_FLAVOUR         ?= corteza
-BUILD_TIME            ?= $(shell date +%FT%T%z)
-BUILD_VERSION         ?= $(shell git describe --tags --abbrev=0)
-BUILD_ARCH            ?= $(shell go env GOARCH)
-BUILD_OS              ?= $(shell go env GOOS)
-BUILD_OS_is_windows    = $(filter windows,$(BUILD_OS))
-BUILD_DEST_DIR        ?= build
-BUILD_NAME             = $(BUILD_FLAVOUR)-server-$(BUILD_VERSION)-$(BUILD_OS)-$(BUILD_ARCH)
-BUILD_BIN_NAME         = $(BUILD_NAME)$(if $(BUILD_OS_is_windows),.exe,)
-
-RELEASE_BASEDIR        = $(BUILD_DEST_DIR)/pkg/$(BUILD_FLAVOUR)-server
-RELEASE_NAME           = $(BUILD_NAME).tar.gz
-RELEASE_EXTRA_FILES   ?= README.md LICENSE CONTRIBUTING.md DCO .env.example
-RELEASE_PKEY          ?= .upload-rsa
-
-LDFLAGS_VERSION        = -X github.com/cortezaproject/corteza-server/pkg/version.Version=$(BUILD_VERSION)
-LDFLAGS_EXTRA         ?=
-LDFLAGS                = -ldflags "$(LDFLAGS_VERSION) $(LDFLAGS_EXTRA)"
-
-# Run go test cmd with flags, eg:
-# $> make test.integration TEST_FLAGS="-v"
-# $> make test.integration TEST_FLAGS="-v -run SpecialTest"
-TEST_FLAGS ?=
-
-COVER_MODE    ?= count
-COVER_PROFILE ?= .cover.out
-COVER_FLAGS   ?= -covermode=$(COVER_MODE)  -coverprofile=$(COVER_PROFILE)
-
-# Cover package maps for tests tasks
-COVER_PKGS_system      = ./system/...
-COVER_PKGS_compose     = ./compose/...
-COVER_PKGS_federation  = ./federation/...
-COVER_PKGS_automation  = ./automation/...
-COVER_PKGS_pkg         = ./pkg/...
-COVER_PKGS_all         = $(COVER_PKGS_pkg),$(COVER_PKGS_system),$(COVER_PKGS_compose),$(COVER_PKGS_federation),$(COVER_PKGS_automation)
-COVER_PKGS_integration = $(COVER_PKGS_all)
-
-TEST_SUITE_pkg         = ./pkg/...
-TEST_SUITE_services    = ./compose/... ./system/... ./federation/... ./auth/... ./automation/...
-TEST_SUITE_unit        = $(TEST_SUITE_pkg) $(TEST_SUITE_services)
-TEST_SUITE_integration = ./tests/...
-TEST_SUITE_store       = ./store/tests/...
-TEST_SUITE_all         = $(TEST_SUITE_unit) $(TEST_SUITE_integration) $(TEST_SUITE_store)
 
 # Dev Support apps settings
 DEV_MINIO_PORT        ?= 9000
@@ -57,56 +12,123 @@ GIN_ARGS      ?= --laddr $(GIN_ARG_LADDR) --immediate
 
 DOCKER                ?= docker
 
-help:
-	@echo ""
-	@echo " Usage: make [target]"
-	@echo ""
-	@echo " - build             build all apps"
-	@echo " - build.<app>       build a specific app"
-	@echo " - vet               run go vet on all code"
-	@echo " - critic            run go critic on all code"
-	@echo " - test.all          run all tests"
-	@echo " - test.unit         run all unit tests"
-	@echo " - test.integration  run all integration tests"
-	@echo ""
-	@echo " See tests/README.md for more info on running tests"
-	@echo ""
+
+.PHONY: help
+help: ## show make targets
+	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-\\.%]+:.*?## / {sub("\\\\n",sprintf("\n%22c"," "), $$2);printf " \033[36m%-20s\033[0m  %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+
+.PHONY: help.build
+help.build: ## show build make targets
+	@ $(MAKE) --directory=build help
+
+.PHONY: help.test
+help.test: ## show test make targets
+	@ $(MAKE) --directory=tests help
 
 ########################################################################################################################
-# Building & packing
+# Building & packaging
 
-build: $(BUILD_DEST_DIR)/$(BUILD_BIN_NAME)
+build%: ## run build targets
+	@ $(MAKE) --directory=build build$*
 
-$(BUILD_DEST_DIR)/$(BUILD_BIN_NAME):
-		GOOS=$(BUILD_OS) GOARCH=$(BUILD_ARCH) go build $(LDFLAGS) -o $@ cmd/corteza/main.go
 
-release: build $(BUILD_DEST_DIR)/$(RELEASE_NAME)
 
-$(BUILD_DEST_DIR)/$(RELEASE_NAME):
-	@ mkdir -p $(RELEASE_BASEDIR) $(RELEASE_BASEDIR)/bin
-	@ cp $(RELEASE_EXTRA_FILES) $(RELEASE_BASEDIR)/
-	@ cp -r provision $(RELEASE_BASEDIR)
-	@ rm -f $(RELEASE_BASEDIR)/provision/README.adoc $(RELEASE_BASEDIR)/provision/update.sh
-	@ cp $(BUILD_DEST_DIR)/$(BUILD_BIN_NAME) $(RELEASE_BASEDIR)/bin/$(BUILD_FLAVOUR)-server
-	tar -C $(dir $(RELEASE_BASEDIR)) -czf $(BUILD_DEST_DIR)/$(RELEASE_NAME) $(notdir $(RELEASE_BASEDIR))
+#build: $(BUILD_DEST_DIR)/$(BUILD_BIN_NAME) ## build corteza-server
+#
+#$(BUILD_DEST_DIR)/$(BUILD_BIN_NAME):
+#		GOOS=$(BUILD_OS) GOARCH=$(BUILD_ARCH) go build $(LDFLAGS) -o $@ cmd/corteza/main.go
+#
+#release: build $(BUILD_DEST_DIR)/$(RELEASE_NAME)
+#
+#$(BUILD_DEST_DIR)/$(RELEASE_NAME):
+#	@ mkdir -p $(RELEASE_BASEDIR) $(RELEASE_BASEDIR)/bin
+#	@ cp $(RELEASE_EXTRA_FILES) $(RELEASE_BASEDIR)/
+#	@ cp -r provision $(RELEASE_BASEDIR)
+#	@ rm -f $(RELEASE_BASEDIR)/provision/README.adoc $(RELEASE_BASEDIR)/provision/update.sh
+#	@ cp $(BUILD_DEST_DIR)/$(BUILD_BIN_NAME) $(RELEASE_BASEDIR)/bin/$(BUILD_FLAVOUR)-server
+#	tar -C $(dir $(RELEASE_BASEDIR)) -czf $(BUILD_DEST_DIR)/$(RELEASE_NAME) $(notdir $(RELEASE_BASEDIR))
+#
+#release-clean:
+#	rm -rf $(BUILD_DEST_DIR)/$(BUILD_BIN_NAME)
+#	rm -rf $(BUILD_DEST_DIR)/$(RELEASE_NAME)
 
-release-clean:
-	rm -rf $(BUILD_DEST_DIR)/$(BUILD_BIN_NAME)
-	rm -rf $(BUILD_DEST_DIR)/$(RELEASE_NAME)
 
-upload: $(RELEASE_PKEY)
-	@ echo "put $(BUILD_DEST_DIR)/*.tar.gz" | sftp -q -i $(RELEASE_PKEY) $(RELEASE_SFTP_URI)
-	@ rm -f $(RELEASE_PKEY)
+#######################################################################################################################
+# Quality Assurance
 
-$(RELEASE_PKEY):
-	@ echo $(RELEASE_SFTP_KEY) | base64 -d > $@
-	@ chmod 0400 $@
+test%: ## run test targets
+	@ $(MAKE) --directory=tests test$*
+
+
+#.PHONY: test
+#test: ## run all tests
+#	@ $(MAKE) --directory=tests test
+#
+#test.coverprofile.%:  ## adds -coverprofile flag to test flags
+#	@ $(MAKE) --directory=tests test.coverprofile.$*
+#
+#test.cover.%: ## adds -coverpkg flag
+#	@ $(MAKE) --directory=tests test.cover.$*
+#
+#.PHONY: test.unit
+#test.unit: ## run unit tests
+#	@ $(MAKE) --directory=tests test.unit
+#
+#.PHONY: test.unit.%
+#test.unit.%: ## run <dir> unit tests
+#	@ $(MAKE) --directory=tests test.unit.$*
+#
+#.PHONY: test.integration
+#test.integration: ## run integration tests
+#	@ $(MAKE) --directory=tests test.integration
+#
+#.PHONY: test.integration.%
+#test.integration.%: ## run <dir> integration tests
+#	@ $(MAKE) --directory=tests test.integration.$*
+#
+#.PHONY: test.store
+#test.store: ## run store tests
+#	@ $(MAKE) --directory=tests test.store
+#
+#.PHONY: test.store.%
+#test.store.%: ## run <dir> store tests
+#	@ $(MAKE) --directory=tests test.store.$*
+
+vet: ## run go vet
+	$(GO) vet ./...
+
+critic: $(GOCRITIC) ## run gocritic
+	$(GOCRITIC) check-project .
+
+staticcheck: $(STATICCHECK) ## run staticcheck
+	$(STATICCHECK) ./pkg/... ./system/... ./compose/... ./automation/...
+
+qa: vet critic test ## run quality assurance
+
+mocks: $(MOCKGEN) ## create mocks
+	$(MOCKGEN) -package mail -source pkg/mail/mail.go -destination pkg/mail/mail_mock_test.go
+
 
 ########################################################################################################################
 # Development
 
 watch: $(GIN)
 	$(GIN) $(GIN_ARGS) --build cmd/corteza run -- serve
+
+# Development helper - reruns test when files change
+#
+# make watch.test.unit
+# make watch.test.pkg
+# make watch.test.all
+# make watch.test.pkg TEST_FLAGS="-v"
+
+watch.test.%: $(FSWATCH)
+	( make test.$* || exit 0 ) && ( $(FSWATCH) -o . | xargs -n1 -I{} make test.$* )
+
+watch.test: watch.test.all
+
+watch.codegen: $(CODEGEN)
+	@ $(CODEGEN) -w -v
 
 realize: watch # BC
 
@@ -118,111 +140,12 @@ minio.up:
 	# No volume mounts because we do not want the data to persist
 	$(DOCKER) run --rm --publish $(DEV_MINIO_PORT):9000 --env-file .env minio/minio server /data
 
-# Development helper - reruns test when files change
-#
-# make watch.test.unit
-# make watch.test.pkg
-# make watch.test.all
-# make watch.test.pkg TEST_FLAGS="-v"
-watch.test.%: $(FSWATCH)
-	( make test.$* || exit 0 ) && ( $(FSWATCH) -o . | xargs -n1 -I{} make test.$* )
-
-watch.test: watch.test.unit
-
 # codegen: $(PROTOGEN)
 codegen: $(CODEGEN)
 	@ $(CODEGEN) -v
 
-watch.codegen: $(CODEGEN)
-	@ $(CODEGEN) -w -v
-
 clean.codegen:
 	rm -f $(CODEGEN)
 
-provision:
-	$(MAKE) --directory=provision clean all
-
 webapp:
 	@ $(MAKE) --directory=webapp
-
-
-#######################################################################################################################
-# Quality Assurance
-
-# Adds -coverprofile flag to test flags
-# and executes test.cover... task
-test.coverprofile.%:
-	@ TEST_FLAGS="$(TEST_FLAGS) -coverprofile=$(COVER_PROFILE)" make test.cover.$*
-
-# Adds -coverpkg flag
-test.cover.%:
-	@ TEST_FLAGS="$(TEST_FLAGS) -coverpkg=$(COVER_PKGS_$*)" make test.$*
-
-# Runs integration tests
-test.integration: $(GOTEST)
-	$(GOTEST) $(TEST_FLAGS) $(TEST_SUITE_integration)
-
-# Runs one suite from integration tests
-test.integration.%: $(GOTEST)
-	$(GOTEST) $(TEST_FLAGS) ./tests/$*/...
-
-# Runs store tests
-test.store: $(GOTEST)
-	$(GOTEST) $(TEST_FLAGS) $(TEST_SUITE_store)
-
-# Runs one suite from store tests
-test.store.%: $(GOTEST)
-	$(GOTEST) $(TEST_FLAGS) ./store/tests/$*/...
-
-# Runs ALL tests
-test.all: $(GOTEST)
-	$(GOTEST) $(TEST_FLAGS) $(TEST_SUITE_all)
-
-# Unit testing testing, system or compose
-test.unit.%: $(GOTEST)
-	$(GOTEST) $(TEST_FLAGS) ./$*/...
-
-# Runs ALL tests
-test.unit: $(GOTEST)
-	$(GOTEST) $(TEST_FLAGS) $(TEST_SUITE_unit)
-
-# Testing pkg
-test.pkg: $(GOTEST)
-	$(GOTEST) $(TEST_FLAGS) $(TEST_SUITE_pkg)
-
-# Test defaults to test.unit
-test: test.unit
-
-
-vet:
-	$(GO) vet ./...
-
-critic: $(GOCRITIC)
-	$(GOCRITIC) check-project .
-
-staticcheck: $(STATICCHECK)
-	$(STATICCHECK) ./pkg/... ./system/... ./compose/... ./automation/...
-
-qa: vet critic test
-
-mocks: $(MOCKGEN)
-	$(MOCKGEN) -package mail -source pkg/mail/mail.go -destination pkg/mail/mail_mock_test.go
-
-
-########################################################################################################################
-# Toolset
-
-# @todo this will most likely need some special care for other platforms
-$(FSWATCH):
-	ifeq ($(UNAME_S),Darwin)
-		brew install fswatch
-	endif
-
-# https://grpc.io/docs/protoc-installation/
-# @todo $ apt install -y protobuf-compiler
-$(PROTOC):
-	ifeq ($(UNAME_S),Darwin)
-		brew install protobuf
-	endif
-
-#

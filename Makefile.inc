@@ -56,5 +56,18 @@ $(STATIK):
 $(CODEGEN):
 	$(GO) build -o $@ cmd/codegen/main.go
 
+# @todo this will most likely need some special care for other platforms
+$(FSWATCH):
+	ifeq ($(UNAME_S),Darwin)
+		brew install fswatch
+	endif
+
+# https://grpc.io/docs/protoc-installation/
+# @todo $ apt install -y protobuf-compiler
+$(PROTOC):
+	ifeq ($(UNAME_S),Darwin)
+		brew install protobuf
+	endif
+
 clean-tools:
 	rm -f $(BINS)
