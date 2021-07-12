@@ -2,16 +2,21 @@ package apigw
 
 import (
 	"context"
+	"encoding/json"
 
+	as "github.com/cortezaproject/corteza-server/automation/service"
+	"github.com/cortezaproject/corteza-server/pkg/filter"
+	"github.com/cortezaproject/corteza-server/pkg/options"
 	"github.com/cortezaproject/corteza-server/system/types"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/go-chi/chi"
 	"go.uber.org/zap"
 )
 
 type (
 	storer interface {
-		SearchApigwRoutes(ctx context.Context, f types.RouteFilter) (types.RouteSet, types.RouteFilter, error)
-		SearchApigwFunctions(ctx context.Context, f types.FunctionFilter) (types.FunctionSet, types.FunctionFilter, error)
+		SearchApigwRoutes(ctx context.Context, f types.ApigwRouteFilter) (types.ApigwRouteSet, types.ApigwRouteFilter, error)
+		SearchApigwFunctions(ctx context.Context, f types.ApigwFunctionFilter) (types.ApigwFunctionSet, types.ApigwFunctionFilter, error)
 	}
 
 	apigw struct {
@@ -64,7 +69,7 @@ func (s *apigw) Reload(ctx context.Context) {
 }
 
 func (s *apigw) loadRoutes(ctx context.Context) (rr []*route, err error) {
-	routes, _, err := s.storer.SearchApigwRoutes(ctx, types.RouteFilter{Enabled: true})
+	routes, _, err := s.storer.SearchApigwRoutes(ctx, types.ApigwRouteFilter{Enabled: true, Deleted: filter.StateExcluded})
 
 	if err != nil {
 		return
@@ -83,52 +88,54 @@ func (s *apigw) loadRoutes(ctx context.Context) (rr []*route, err error) {
 	return
 }
 
-func (s *apigw) loadFunctions(ctx context.Context, route uint64) (ff []*types.Function, err error) {
-	ff, _, err = s.storer.SearchApigwFunctions(ctx, types.FunctionFilter{})
+func (s *apigw) loadFunctions(ctx context.Context, route uint64) (ff []*types.ApigwFunction, err error) {
+	ff, _, err = s.storer.SearchApigwFunctions(ctx, types.ApigwFunctionFilter{RouteID: route})
 	return
 }
 
-func (s *apigw) Router(ctx context.Context) func(r chi.Router) {
-	return func(r chi.Router) {
-		routes, err := s.loadRoutes(ctx)
+func (s *apigw) Router(r chi.Router) {
+	var (
+		ctx = context.Background()
+	)
 
-		if err != nil {
-			s.log.Error("could not load routes", zap.Error(err))
-			return
-		}
+	routes, err := s.loadRoutes(ctx)
 
-		s.Init(ctx, routes...)
+	if err != nil {
+		s.log.Error("could not load routes", zap.Error(err))
+		return
+	}
 
-		for _, route := range s.routes {
-			r.Handle(route.endpoint, route)
-		}
+	s.Init(ctx, routes...)
 
-		go func() {
-			for {
-				select {
-				case <-s.reload:
-					s.log.Debug("got reload signal")
+	for _, route := range s.routes {
+		r.Handle(route.endpoint, route)
+	}
 
-					routes, err := s.loadRoutes(ctx)
+	go func() {
+		for {
+			select {
+			case <-s.reload:
+				s.log.Debug("got reload signal")
 
-					if err != nil {
-						s.log.Error("could not reload routes", zap.Error(err))
-						return
-					}
+				routes, err := s.loadRoutes(ctx)
 
-					s.Init(ctx, routes...)
-
-					for _, route := range s.routes {
-						r.Handle(route.endpoint, route)
-					}
-
-				case <-ctx.Done():
-					s.log.Debug("done! getting out")
+				if err != nil {
+					s.log.Error("could not reload routes", zap.Error(err))
 					return
 				}
+
+				s.Init(ctx, routes...)
+
+				for _, route := range s.routes {
+					r.Handle(route.endpoint, route)
+				}
+
+			case <-ctx.Done():
+				s.log.Debug("done! getting out")
+				return
 			}
-		}()
-	}
+		}
+	}()
 }
 
 // init all the routes
@@ -154,8 +161,6 @@ func (s *apigw) Init(ctx context.Context, route ...*route) {
 		})
 
 		for _, f := range regFuncs {
-			fc := functionHandler{}
-
 			h, err := s.reg.Get(f.Ref)
 
 			if err != nil {
@@ -163,23 +168,39 @@ func (s *apigw) Init(ctx context.Context, route ...*route) {
 				continue
 			}
 
-			fc.Merge(ctx, h.Meta(f))
-			fc.SetHandler(h.Handler())
+			enc, err := json.Marshal(f.Params)
 
-			r.pipe.Add(fc, f.Params)
+			if err != nil {
+				spew.Dump(err)
+				// continue
+			}
+
+			h, err = s.reg.Merge(h, enc)
+
+			spew.Dump(err)
+
+			if err != nil {
+				s.log.Error("could not merge params to handler", zap.String("route", r.endpoint), zap.Error(err))
+			}
+
+			r.pipe.Add(h, f.Params)
 		}
 	}
 }
 
+// todo - kind filtering
 func (s *apigw) Funcs(kind string) (list functionMetaList) {
 	list = s.reg.All()
 
 	if kind != "" {
 		list, _ = list.Filter(func(fm *functionMeta) (bool, error) {
-			// return fm.
-			return fm.Kind == kind, nil
+			return string(fm.Kind) == kind, nil
 		})
 	}
 
 	return
+}
+
+func NewWorkflow() (wf WfExecer) {
+	return as.Workflow(&zap.Logger{}, options.CorredorOpt{})
 }

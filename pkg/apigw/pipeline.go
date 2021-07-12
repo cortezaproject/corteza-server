@@ -3,12 +3,11 @@ package apigw
 import (
 	"context"
 	"net/http"
-	"sort"
 )
 
 type (
 	Execer interface {
-		Exec(context.Context, *scp, map[string]interface{}) error
+		Exec(context.Context, *scp) error
 	}
 
 	Sorter interface {
@@ -26,7 +25,7 @@ type (
 
 	Worker interface {
 		Execer
-		Sorter
+		// Sorter
 	}
 
 	workers []Payload
@@ -63,7 +62,7 @@ func (s scp) Set(k string, v interface{}) {
 // functionality that takes place in worker
 func (pp *pl) Exec(ctx context.Context, scope *scp) (err error) {
 	for _, w := range pp.w {
-		err = w.worker.Exec(ctx, scope, w.params)
+		err = w.worker.Exec(ctx, scope)
 
 		if err != nil {
 			// call the error handler
@@ -79,7 +78,7 @@ func (pp *pl) Exec(ctx context.Context, scope *scp) (err error) {
 // fethed from store
 func (pp *pl) Add(ff Worker, p map[string]interface{}) {
 	pp.w = append(pp.w, Payload{worker: ff, params: p})
-	sort.Sort(pp.w)
+	// sort.Sort(pp.w)
 }
 
 // add error handler
@@ -87,8 +86,8 @@ func (pp *pl) ErrorHandler(ff ErrorHandler) {
 	pp.err = ff
 }
 
-func (a workers) Len() int { return len(a) }
-func (a workers) Less(i, j int) bool {
-	return a[i].worker.Weight() < a[j].worker.Weight()
-}
-func (a workers) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
+// func (a workers) Len() int { return len(a) }
+// func (a workers) Less(i, j int) bool {
+// 	return a[i].worker.Weight() < a[j].worker.Weight()
+// }
+// func (a workers) Swap(i, j int) { a[i], a[j] = a[j], a[i] }

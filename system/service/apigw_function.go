@@ -28,7 +28,7 @@ func Function() *function {
 	})
 }
 
-func (svc *function) FindByID(ctx context.Context, ID uint64) (q *types.Function, err error) {
+func (svc *function) FindByID(ctx context.Context, ID uint64) (q *types.ApigwFunction, err error) {
 	var (
 		rProps = &functionActionProps{}
 	)
@@ -54,7 +54,7 @@ func (svc *function) FindByID(ctx context.Context, ID uint64) (q *types.Function
 	return q, svc.recordAction(ctx, rProps, FunctionActionLookup, err)
 }
 
-func (svc *function) Create(ctx context.Context, new *types.Function) (q *types.Function, err error) {
+func (svc *function) Create(ctx context.Context, new *types.ApigwFunction) (q *types.ApigwFunction, err error) {
 	var (
 		qProps = &functionActionProps{function: new}
 	)
@@ -79,8 +79,7 @@ func (svc *function) Create(ctx context.Context, new *types.Function) (q *types.
 
 		q = new
 		// send the signal to reload all functions
-		// 	apigw.Service().Reload(ctx)
-		// }
+		apigw.Service().Reload(ctx)
 
 		return nil
 	}()
@@ -88,10 +87,10 @@ func (svc *function) Create(ctx context.Context, new *types.Function) (q *types.
 	return q, svc.recordAction(ctx, qProps, FunctionActionCreate, err)
 }
 
-func (svc *function) Update(ctx context.Context, upd *types.Function) (q *types.Function, err error) {
+func (svc *function) Update(ctx context.Context, upd *types.ApigwFunction) (q *types.ApigwFunction, err error) {
 	var (
 		qProps = &functionActionProps{function: upd}
-		qq     *types.Function
+		qq     *types.ApigwFunction
 		e      error
 	)
 
@@ -124,7 +123,7 @@ func (svc *function) Update(ctx context.Context, upd *types.Function) (q *types.
 		q = upd
 
 		// send the signal to reload all function
-		// apigw.Service().Reload(ctx)
+		apigw.Service().Reload(ctx)
 
 		return nil
 	}()
@@ -135,7 +134,7 @@ func (svc *function) Update(ctx context.Context, upd *types.Function) (q *types.
 func (svc *function) DeleteByID(ctx context.Context, ID uint64) (err error) {
 	var (
 		qProps = &functionActionProps{}
-		q      *types.Function
+		q      *types.ApigwFunction
 	)
 
 	err = func() (err error) {
@@ -157,7 +156,7 @@ func (svc *function) DeleteByID(ctx context.Context, ID uint64) (err error) {
 		}
 
 		// send the signal to reload all queues
-		// apigw.Service().Reload(ctx)
+		apigw.Service().Reload(ctx)
 
 		return nil
 	}()
@@ -168,7 +167,7 @@ func (svc *function) DeleteByID(ctx context.Context, ID uint64) (err error) {
 func (svc *function) UndeleteByID(ctx context.Context, ID uint64) (err error) {
 	var (
 		qProps = &functionActionProps{}
-		q      *types.Function
+		q      *types.ApigwFunction
 	)
 
 	err = func() (err error) {
@@ -190,7 +189,7 @@ func (svc *function) UndeleteByID(ctx context.Context, ID uint64) (err error) {
 		}
 
 		// send the signal to reload all queues
-		// apigw.Service().Reload(ctx)
+		apigw.Service().Reload(ctx)
 
 		return nil
 	}()
@@ -198,7 +197,7 @@ func (svc *function) UndeleteByID(ctx context.Context, ID uint64) (err error) {
 	return svc.recordAction(ctx, qProps, FunctionActionDelete, err)
 }
 
-func (svc *function) Search(ctx context.Context, filter types.FunctionFilter) (r types.FunctionSet, f types.FunctionFilter, err error) {
+func (svc *function) Search(ctx context.Context, filter types.ApigwFunctionFilter) (r types.ApigwFunctionSet, f types.ApigwFunctionFilter, err error) {
 	var (
 		aProps = &functionActionProps{search: &filter}
 	)

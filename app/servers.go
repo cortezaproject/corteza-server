@@ -109,7 +109,7 @@ func (app *CortezaApp) mountHttpRoutes(r chi.Router) {
 			// temp api gateway support
 			{
 				apigw.Setup(struct{}{}, app.Log, service.DefaultStore)
-				r.Route("/gateway", apigw.Service().Router(context.Background()))
+				r.Route("/gateway", apigw.Service().Router)
 			}
 
 			var fullpathDocs = options.CleanBase(ho.BaseUrl, ho.ApiBaseUrl, "docs")

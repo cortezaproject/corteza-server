@@ -21,8 +21,8 @@ func (r route) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		scope = scp{}
 	)
 
-	scope["request"] = req
-	scope["writer"] = w
+	scope.Set("request", req)
+	scope.Set("writer", w)
 
 	err := r.pipe.Exec(ctx, &scope)
 
