@@ -2,6 +2,7 @@ package documents
 
 import (
 	"context"
+
 	"github.com/cortezaproject/corteza-server/pkg/filter"
 	"github.com/cortezaproject/corteza-server/pkg/rbac"
 	"github.com/cortezaproject/corteza-server/system/service"
@@ -74,7 +75,7 @@ func (d systemResources) Users(ctx context.Context, limit uint, cur string) (rsp
 				Deleted:      makePartialChange(u.DeletedAt),
 			}
 
-			doc.Security.AllowedRoles, doc.Security.DeniedRoles = d.rbac.SignificantRoles(u.RBACResource(), "read")
+			doc.Security.AllowedRoles, doc.Security.DeniedRoles = d.rbac.SignificantRoles(u, "read")
 
 			rsp.Documents[i].ID = u.ID
 			rsp.Documents[i].URL = "@todo"

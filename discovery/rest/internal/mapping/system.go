@@ -3,6 +3,7 @@ package mapping
 import (
 	"context"
 	"fmt"
+
 	"github.com/cortezaproject/corteza-server/system/service"
 )
 
@@ -11,7 +12,7 @@ type (
 		CanSearchUsers(ctx context.Context) bool
 		CanSearchRoles(ctx context.Context) bool
 		CanSearchApplications(ctx context.Context) bool
-		CanSearchAuthClient(ctx context.Context) bool
+		CanSearchAuthClients(ctx context.Context) bool
 	}
 
 	systemMapping struct {

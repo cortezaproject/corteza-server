@@ -52,7 +52,6 @@ type (
 	userAccessController interface {
 		CanSearchUsers(context.Context) bool
 		CanCreateUser(context.Context) bool
-		CanSearchUsers(context.Context) bool
 		CanReadUser(context.Context, *types.User) bool
 		CanUpdateUser(context.Context, *types.User) bool
 		CanDeleteUser(context.Context, *types.User) bool

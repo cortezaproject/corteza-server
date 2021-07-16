@@ -3,9 +3,10 @@ package mapping
 import (
 	"context"
 	"fmt"
+	"strings"
+
 	"github.com/cortezaproject/corteza-server/compose/service"
 	"github.com/cortezaproject/corteza-server/compose/types"
-	"strings"
 )
 
 type (
@@ -19,7 +20,7 @@ type (
 
 	composeAccessControl interface {
 		CanReadRecordValue(ctx context.Context, r *types.ModuleField) bool
-		CanSearchRecords(ctx context.Context, r *types.Module) bool
+		CanSearchRecordsOnModule(ctx context.Context, r *types.Module) bool
 	}
 
 	composeMapping struct {

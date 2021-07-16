@@ -3,8 +3,9 @@ package documents
 import (
 	"context"
 	"fmt"
-	"github.com/cortezaproject/corteza-server/compose/service"
-	"github.com/cortezaproject/corteza-server/compose/types"
+
+	cmpService "github.com/cortezaproject/corteza-server/compose/service"
+	cmpTypes "github.com/cortezaproject/corteza-server/compose/types"
 	"github.com/cortezaproject/corteza-server/pkg/errors"
 	"github.com/cortezaproject/corteza-server/pkg/filter"
 	"github.com/cortezaproject/corteza-server/pkg/rbac"
@@ -21,26 +22,26 @@ type (
 		}
 
 		ac interface {
-			CanReadModule(ctx context.Context, r *types.Module) bool
-			CanReadNamespace(ctx context.Context, r *types.Namespace) bool
-			CanReadRecord(ctx context.Context, r *types.Module) bool
-			CanReadRecordValue(ctx context.Context, r *types.ModuleField) bool
-			CanReadChart(ctx context.Context, r *types.Chart) bool
-			CanReadPage(ctx context.Context, r *types.Page) bool
+			CanReadModule(ctx context.Context, r *cmpTypes.Module) bool
+			CanReadNamespace(ctx context.Context, r *cmpTypes.Namespace) bool
+			CanReadRecord(ctx context.Context, r *cmpTypes.Record) bool
+			CanReadRecordValue(ctx context.Context, r *cmpTypes.ModuleField) bool
+			CanReadChart(ctx context.Context, r *cmpTypes.Chart) bool
+			CanReadPage(ctx context.Context, r *cmpTypes.Page) bool
 		}
 
 		ns interface {
-			FindByID(context.Context, uint64) (*types.Namespace, error)
-			Find(context.Context, types.NamespaceFilter) (types.NamespaceSet, types.NamespaceFilter, error)
+			FindByID(context.Context, uint64) (*cmpTypes.Namespace, error)
+			Find(context.Context, cmpTypes.NamespaceFilter) (cmpTypes.NamespaceSet, cmpTypes.NamespaceFilter, error)
 		}
 
 		mod interface {
-			FindByID(context.Context, uint64, uint64) (*types.Module, error)
-			Find(ctx context.Context, filter types.ModuleFilter) (set types.ModuleSet, f types.ModuleFilter, err error)
+			FindByID(context.Context, uint64, uint64) (*cmpTypes.Module, error)
+			Find(ctx context.Context, filter cmpTypes.ModuleFilter) (set cmpTypes.ModuleSet, f cmpTypes.ModuleFilter, err error)
 		}
 
 		rec interface {
-			Find(ctx context.Context, filter types.RecordFilter) (set types.RecordSet, f types.RecordFilter, err error)
+			Find(ctx context.Context, filter cmpTypes.RecordFilter) (set cmpTypes.RecordSet, f cmpTypes.RecordFilter, err error)
 		}
 	}
 )
@@ -49,10 +50,10 @@ func ComposeResources() *composeResources {
 	return &composeResources{
 		settings: sysService.CurrentSettings,
 		rbac:     rbac.Global(),
-		ac:       service.DefaultAccessControl,
-		ns:       service.DefaultNamespace,
-		mod:      service.DefaultModule,
-		rec:      service.DefaultRecord,
+		ac:       cmpService.DefaultAccessControl,
+		ns:       cmpService.DefaultNamespace,
+		mod:      cmpService.DefaultModule,
+		rec:      cmpService.DefaultRecord,
 	}
 }
 
@@ -63,8 +64,8 @@ func (d composeResources) Namespaces(ctx context.Context, limit uint, cur string
 		}
 
 		var (
-			nss types.NamespaceSet
-			f   = types.NamespaceFilter{
+			nss cmpTypes.NamespaceSet
+			f   = cmpTypes.NamespaceFilter{
 				Deleted: filter.StateInclusive,
 			}
 		)
@@ -104,7 +105,7 @@ func (d composeResources) Namespaces(ctx context.Context, limit uint, cur string
 				Deleted: makePartialChange(ns.DeletedAt),
 			}
 
-			doc.Security.AllowedRoles, doc.Security.DeniedRoles = d.rbac.SignificantRoles(ns.RBACResource(), "read")
+			doc.Security.AllowedRoles, doc.Security.DeniedRoles = d.rbac.SignificantRoles(ns, "read")
 
 			rsp.Documents[i].Source = doc
 		}
@@ -120,9 +121,9 @@ func (d composeResources) Modules(ctx context.Context, namespaceID uint64, limit
 		}
 
 		var (
-			ns *types.Namespace
-			mm types.ModuleSet
-			f  = types.ModuleFilter{
+			ns *cmpTypes.Namespace
+			mm cmpTypes.ModuleSet
+			f  = cmpTypes.ModuleFilter{
 				NamespaceID: namespaceID,
 				Deleted:     filter.StateInclusive,
 			}
@@ -180,7 +181,7 @@ func (d composeResources) Modules(ctx context.Context, namespaceID uint64, limit
 				Deleted: makePartialChange(mod.DeletedAt),
 			}
 
-			doc.Security.AllowedRoles, doc.Security.DeniedRoles = d.rbac.SignificantRoles(mod.RBACResource(), "read")
+			doc.Security.AllowedRoles, doc.Security.DeniedRoles = d.rbac.SignificantRoles(mod, "read")
 
 			rsp.Documents[i].Source = doc
 		}
@@ -196,10 +197,10 @@ func (d composeResources) Records(ctx context.Context, namespaceID, moduleID uin
 		}
 
 		var (
-			ns  *types.Namespace
-			mod *types.Module
-			rr  types.RecordSet
-			f   = types.RecordFilter{
+			ns  *cmpTypes.Namespace
+			mod *cmpTypes.Module
+			rr  cmpTypes.RecordSet
+			f   = cmpTypes.RecordFilter{
 				NamespaceID: namespaceID,
 				ModuleID:    moduleID,
 				Deleted:     filter.StateInclusive,
@@ -259,7 +260,7 @@ func (d composeResources) Records(ctx context.Context, namespaceID, moduleID uin
 				Deleted:      makePartialChange(rec.DeletedAt),
 			}
 
-			doc.Security.AllowedRoles, doc.Security.DeniedRoles = d.rbac.SignificantRoles(rec.RBACResource(), "read")
+			doc.Security.AllowedRoles, doc.Security.DeniedRoles = d.rbac.SignificantRoles(rec, "read")
 
 			rsp.Documents[i].Source = doc
 		}
@@ -268,7 +269,7 @@ func (d composeResources) Records(ctx context.Context, namespaceID, moduleID uin
 	}()
 }
 
-func (d composeResources) recordValues(ctx context.Context, rec *types.Record) map[string][]interface{} {
+func (d composeResources) recordValues(ctx context.Context, rec *cmpTypes.Record) map[string][]interface{} {
 	var (
 		rval = make(map[string][]interface{})
 	)
@@ -277,7 +278,7 @@ func (d composeResources) recordValues(ctx context.Context, rec *types.Record) m
 		return nil
 	}
 
-	_ = rec.GetModule().Fields.Walk(func(f *types.ModuleField) error {
+	_ = rec.GetModule().Fields.Walk(func(f *cmpTypes.ModuleField) error {
 		if !d.ac.CanReadRecordValue(ctx, f) {
 			return nil
 		}

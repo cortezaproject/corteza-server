@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	discovery "github.com/cortezaproject/corteza-server/discovery/types"
 	"github.com/cortezaproject/corteza-server/pkg/filter"
-	"github.com/cortezaproject/corteza-server/pkg/rbac"
 	"github.com/pkg/errors"
 	"time"
 )

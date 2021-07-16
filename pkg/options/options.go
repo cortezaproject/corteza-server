@@ -24,6 +24,7 @@ type (
 		SCIM        SCIMOpt
 		Workflow    WorkflowOpt
 		RBAC        RBACOpt
+		Discovery   DiscoveryOpt
 	}
 )
 
@@ -51,5 +52,6 @@ func Init() *Options {
 		SCIM:        *SCIM(),
 		Workflow:    *Workflow(),
 		RBAC:        *RBAC(),
+		Discovery:   *Discovery(),
 	}
 }
