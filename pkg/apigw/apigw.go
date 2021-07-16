@@ -177,18 +177,15 @@ func (s *apigw) Init(ctx context.Context, route ...*route) {
 
 			h, err = s.reg.Merge(h, enc)
 
-			spew.Dump(err)
-
 			if err != nil {
 				s.log.Error("could not merge params to handler", zap.String("route", r.endpoint), zap.Error(err))
 			}
 
-			r.pipe.Add(h, f.Params)
+			r.pipe.Add(h)
 		}
 	}
 }
 
-// todo - kind filtering
 func (s *apigw) Funcs(kind string) (list functionMetaList) {
 	list = s.reg.All()
 

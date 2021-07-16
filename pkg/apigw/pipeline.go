@@ -2,6 +2,7 @@ package apigw
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 )
 
@@ -18,17 +19,12 @@ type (
 		Exec(context.Context, *scp, error)
 	}
 
-	Payload struct {
-		params map[string]interface{}
-		worker Worker
-	}
-
 	Worker interface {
 		Execer
 		// Sorter
 	}
 
-	workers []Payload
+	workers []Worker
 
 	pl struct {
 		w   workers
@@ -58,15 +54,29 @@ func (s scp) Set(k string, v interface{}) {
 	s[k] = v
 }
 
+func (s scp) Get(k string) (v interface{}, err error) {
+	var ok bool
+
+	if v, ok = s[k]; !ok {
+		err = fmt.Errorf("could not get key on index: %s", k)
+		return
+	}
+
+	return
+}
+
 // Exec takes care of error handling and main
 // functionality that takes place in worker
 func (pp *pl) Exec(ctx context.Context, scope *scp) (err error) {
 	for _, w := range pp.w {
-		err = w.worker.Exec(ctx, scope)
+		err = w.Exec(ctx, scope)
 
 		if err != nil {
-			// call the error handler
-			pp.err.Exec(ctx, scope, err)
+			if pp.err != nil {
+				// call the error handler
+				pp.err.Exec(ctx, scope, err)
+			}
+
 			return
 		}
 	}
@@ -75,9 +85,9 @@ func (pp *pl) Exec(ctx context.Context, scope *scp) (err error) {
 }
 
 // Add registers a new worker with parameters
-// fethed from store
-func (pp *pl) Add(ff Worker, p map[string]interface{}) {
-	pp.w = append(pp.w, Payload{worker: ff, params: p})
+// fetched from store
+func (pp *pl) Add(ff Worker) {
+	pp.w = append(pp.w, ff)
 	// sort.Sort(pp.w)
 }
 
