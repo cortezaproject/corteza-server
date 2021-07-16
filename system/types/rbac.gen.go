@@ -7,6 +7,7 @@ package types
 //
 
 // Definitions file that controls how this file is generated:
+// - system.apigw-function.yaml
 // - system.apigw-route.yaml
 // - system.application.yaml
 // - system.auth-client.yaml
@@ -28,14 +29,46 @@ type (
 )
 
 const (
-	ApigwRouteResourceType  = "corteza::system:apigw-route"
-	ApplicationResourceType = "corteza::system:application"
-	AuthClientResourceType  = "corteza::system:auth-client"
-	RoleResourceType        = "corteza::system:role"
-	TemplateResourceType    = "corteza::system:template"
-	UserResourceType        = "corteza::system:user"
-	ComponentResourceType   = "corteza::system"
+	ApigwFunctionResourceType = "corteza::system:apigw-function"
+	ApigwRouteResourceType    = "corteza::system:apigw-route"
+	ApplicationResourceType   = "corteza::system:application"
+	AuthClientResourceType    = "corteza::system:auth-client"
+	RoleResourceType          = "corteza::system:role"
+	TemplateResourceType      = "corteza::system:template"
+	UserResourceType          = "corteza::system:user"
+	ComponentResourceType     = "corteza::system"
 )
+
+// RbacResource returns string representation of RBAC resource for ApigwFunction by calling ApigwFunctionRbacResource fn
+//
+// RBAC resource is in the corteza::system:apigw-function/... format
+//
+// This function is auto-generated
+func (r ApigwFunction) RbacResource() string {
+	return ApigwFunctionRbacResource(r.ID)
+}
+
+// ApigwFunctionRbacResource returns string representation of RBAC resource for ApigwFunction
+//
+// RBAC resource is in the corteza::system:apigw-function/... format
+//
+// This function is auto-generated
+func ApigwFunctionRbacResource(id uint64) string {
+	cpts := []interface{}{ApigwFunctionResourceType}
+	if id != 0 {
+		cpts = append(cpts, strconv.FormatUint(id, 10))
+	} else {
+		cpts = append(cpts, "*")
+	}
+
+	return fmt.Sprintf(ApigwFunctionRbacResourceTpl(), cpts...)
+
+}
+
+// @todo template
+func ApigwFunctionRbacResourceTpl() string {
+	return "%s/%s"
+}
 
 // RbacResource returns string representation of RBAC resource for ApigwRoute by calling ApigwRouteRbacResource fn
 //

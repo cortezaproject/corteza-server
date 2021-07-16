@@ -7,6 +7,7 @@ package resource
 //
 
 // Definitions file that controls how this file is generated:
+// - system.apigw-function.yaml
 // - system.apigw-route.yaml
 // - system.application.yaml
 // - system.auth-client.yaml
@@ -18,6 +19,19 @@ package resource
 import (
 	"github.com/cortezaproject/corteza-server/system/types"
 )
+
+// SystemApigwFunctionRbacReferences generates RBAC references
+//
+// Resources with "envoy: false" are skipped
+//
+// This function is auto-generated
+func SystemApigwFunctionRbacReferences(apigwFunction string) (res *Ref, pp []*Ref, err error) {
+	if apigwFunction != "*" {
+		res = &Ref{ResourceType: types.ApigwFunctionResourceType, Identifiers: MakeIdentifiers(apigwFunction)}
+	}
+
+	return
+}
 
 // SystemApigwRouteRbacReferences generates RBAC references
 //

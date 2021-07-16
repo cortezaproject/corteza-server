@@ -11,31 +11,42 @@ import (
 )
 
 type (
-	function struct {
+	apigwFunction struct {
 		actionlog actionlog.Recorder
 		store     store.Storer
 		ac        functionAccessController
 	}
 
-	functionAccessController interface{}
+	functionAccessController interface {
+		CanSearchApiGwFunctions(context.Context) bool
+
+		CanCreateApiGwFunction(context.Context) bool
+		CanReadApigwFunction(context.Context, *types.ApigwFunction) bool
+		CanUpdateApigwFunction(context.Context, *types.ApigwFunction) bool
+		CanDeleteApigwFunction(context.Context, *types.ApigwFunction) bool
+	}
 )
 
-func Function() *function {
-	return (&function{
+func Function() *apigwFunction {
+	return (&apigwFunction{
 		ac:        DefaultAccessControl,
 		actionlog: DefaultActionlog,
 		store:     DefaultStore,
 	})
 }
 
-func (svc *function) FindByID(ctx context.Context, ID uint64) (q *types.ApigwFunction, err error) {
+func (svc *apigwFunction) FindByID(ctx context.Context, ID uint64) (q *types.ApigwFunction, err error) {
 	var (
-		rProps = &functionActionProps{}
+		rProps = &apigwFunctionActionProps{}
 	)
 
 	err = func() error {
 		if ID == 0 {
-			return FunctionErrInvalidID()
+			return ApigwFunctionErrInvalidID()
+		}
+
+		if !svc.ac.CanSearchApiGwFunctions(ctx) {
+			return ApigwFunctionErrNotAllowedToRead(rProps)
 		}
 
 		if q, err = store.LookupApigwFunctionByID(ctx, svc.store, ID); err != nil {
@@ -44,25 +55,21 @@ func (svc *function) FindByID(ctx context.Context, ID uint64) (q *types.ApigwFun
 
 		rProps.setFunction(q)
 
-		// if !svc.ac.CanReadMessagebusQueue(ctx, q) {
-		// 	return QueueErrNotAllowedToRead(qProps)
-		// }
-
 		return nil
 	}()
 
-	return q, svc.recordAction(ctx, rProps, FunctionActionLookup, err)
+	return q, svc.recordAction(ctx, rProps, ApigwFunctionActionLookup, err)
 }
 
-func (svc *function) Create(ctx context.Context, new *types.ApigwFunction) (q *types.ApigwFunction, err error) {
+func (svc *apigwFunction) Create(ctx context.Context, new *types.ApigwFunction) (q *types.ApigwFunction, err error) {
 	var (
-		qProps = &functionActionProps{function: new}
+		qProps = &apigwFunctionActionProps{function: new}
 	)
 
 	err = func() (err error) {
-		// if !svc.ac.CanCreateMessagebusQueue(ctx) {
-		// 	return QueueErrNotAllowedToCreate(qProps)
-		// }
+		if !svc.ac.CanCreateApiGwFunction(ctx) {
+			return ApigwFunctionErrNotAllowedToCreate(qProps)
+		}
 
 		// Set new values after beforeCreate events are emitted
 		new.ID = nextID()
@@ -70,7 +77,7 @@ func (svc *function) Create(ctx context.Context, new *types.ApigwFunction) (q *t
 		new.CreatedBy = a.GetIdentityFromContext(ctx).Identity()
 
 		if _, err = DefaultRoute.FindByID(ctx, new.Route); err != nil {
-			return FunctionErrInvalidRoute(qProps)
+			return ApigwFunctionErrNotFound(qProps)
 		}
 
 		if err = store.CreateApigwFunction(ctx, svc.store, new); err != nil {
@@ -84,34 +91,33 @@ func (svc *function) Create(ctx context.Context, new *types.ApigwFunction) (q *t
 		return nil
 	}()
 
-	return q, svc.recordAction(ctx, qProps, FunctionActionCreate, err)
+	return q, svc.recordAction(ctx, qProps, ApigwFunctionActionCreate, err)
 }
 
-func (svc *function) Update(ctx context.Context, upd *types.ApigwFunction) (q *types.ApigwFunction, err error) {
+func (svc *apigwFunction) Update(ctx context.Context, upd *types.ApigwFunction) (q *types.ApigwFunction, err error) {
 	var (
-		qProps = &functionActionProps{function: upd}
+		qProps = &apigwFunctionActionProps{function: upd}
 		qq     *types.ApigwFunction
 		e      error
 	)
 
 	err = func() (err error) {
-		// if !svc.ac.CanUpdateMessagebusQueue(ctx, upd) {
-		// 	return QueueErrNotAllowedToUpdate(qProps)
-		// }
+		if !svc.ac.CanUpdateApigwFunction(ctx, upd) {
+			return ApigwFunctionErrNotAllowedToUpdate(qProps)
+		}
 
 		if qq, e = store.LookupApigwFunctionByID(ctx, svc.store, upd.ID); e != nil {
-			return FunctionErrNotFound(qProps)
+			return ApigwFunctionErrNotFound(qProps)
 		}
 
 		if _, err = DefaultRoute.FindByID(ctx, upd.Route); err != nil {
-			return FunctionErrInvalidRoute(qProps)
+			return err
 		}
 
 		if qq, e = store.LookupApigwFunctionByID(ctx, svc.store, upd.ID); e == nil && qq == nil {
-			return FunctionErrNotFound(qProps)
+			return ApigwFunctionErrNotFound(qProps)
 		}
 
-		// Set new values after beforeCreate events are emitted
 		upd.UpdatedAt = now()
 		upd.CreatedAt = qq.CreatedAt
 		upd.UpdatedBy = a.GetIdentityFromContext(ctx).Identity()
@@ -128,25 +134,25 @@ func (svc *function) Update(ctx context.Context, upd *types.ApigwFunction) (q *t
 		return nil
 	}()
 
-	return q, svc.recordAction(ctx, qProps, FunctionActionUpdate, err)
+	return q, svc.recordAction(ctx, qProps, ApigwFunctionActionUpdate, err)
 }
 
-func (svc *function) DeleteByID(ctx context.Context, ID uint64) (err error) {
+func (svc *apigwFunction) DeleteByID(ctx context.Context, ID uint64) (err error) {
 	var (
-		qProps = &functionActionProps{}
+		qProps = &apigwFunctionActionProps{}
 		q      *types.ApigwFunction
 	)
 
 	err = func() (err error) {
+		if !svc.ac.CanDeleteApigwFunction(ctx, q) {
+			return ApigwFunctionErrNotAllowedToDelete(qProps)
+		}
+
 		if q, err = store.LookupApigwFunctionByID(ctx, svc.store, ID); err != nil {
-			return FunctionErrNotFound(qProps)
+			return ApigwFunctionErrNotFound(qProps)
 		}
 
 		qProps.setFunction(q)
-
-		// if !svc.ac.CanDeleteMessagebusQueue(ctx, q) {
-		// 	return QueueErrNotAllowedToDelete(qProps)
-		// }
 
 		q.DeletedAt = now()
 		q.DeletedBy = a.GetIdentityFromContext(ctx).Identity()
@@ -161,25 +167,25 @@ func (svc *function) DeleteByID(ctx context.Context, ID uint64) (err error) {
 		return nil
 	}()
 
-	return svc.recordAction(ctx, qProps, FunctionActionDelete, err)
+	return svc.recordAction(ctx, qProps, ApigwFunctionActionDelete, err)
 }
 
-func (svc *function) UndeleteByID(ctx context.Context, ID uint64) (err error) {
+func (svc *apigwFunction) UndeleteByID(ctx context.Context, ID uint64) (err error) {
 	var (
-		qProps = &functionActionProps{}
+		qProps = &apigwFunctionActionProps{}
 		q      *types.ApigwFunction
 	)
 
 	err = func() (err error) {
+		if !svc.ac.CanDeleteApigwFunction(ctx, q) {
+			return ApigwFunctionErrNotAllowedToDelete(qProps)
+		}
+
 		if q, err = store.LookupApigwFunctionByID(ctx, svc.store, ID); err != nil {
-			return FunctionErrNotFound(qProps)
+			return ApigwFunctionErrNotFound(qProps)
 		}
 
 		qProps.setFunction(q)
-
-		// if !svc.ac.CanDeleteMessagebusQueue(ctx, q) {
-		// 	return QueueErrNotAllowedToDelete(qProps)
-		// }
 
 		q.DeletedAt = nil
 		q.UpdatedBy = a.GetIdentityFromContext(ctx).Identity()
@@ -194,22 +200,22 @@ func (svc *function) UndeleteByID(ctx context.Context, ID uint64) (err error) {
 		return nil
 	}()
 
-	return svc.recordAction(ctx, qProps, FunctionActionDelete, err)
+	return svc.recordAction(ctx, qProps, ApigwFunctionActionDelete, err)
 }
 
-func (svc *function) Search(ctx context.Context, filter types.ApigwFunctionFilter) (r types.ApigwFunctionSet, f types.ApigwFunctionFilter, err error) {
+func (svc *apigwFunction) Search(ctx context.Context, filter types.ApigwFunctionFilter) (r types.ApigwFunctionSet, f types.ApigwFunctionFilter, err error) {
 	var (
-		aProps = &functionActionProps{search: &filter}
+		aProps = &apigwFunctionActionProps{search: &filter}
 	)
 
 	// For each fetched item, store backend will check if it is valid or not
-	// filter.Check = func(res *messagebus.QueueSettings) (bool, error) {
-	// 	if !svc.ac.CanReadMessagebusQueue(ctx, res) {
-	// 		return false, nil
-	// 	}
+	filter.Check = func(res *types.ApigwFunction) (bool, error) {
+		if !svc.ac.CanReadApigwFunction(ctx, res) {
+			return false, nil
+		}
 
-	// 	return true, nil
-	// }
+		return true, nil
+	}
 
 	err = func() error {
 		if r, f, err = store.SearchApigwFunctions(ctx, svc.store, filter); err != nil {
@@ -219,10 +225,25 @@ func (svc *function) Search(ctx context.Context, filter types.ApigwFunctionFilte
 		return nil
 	}()
 
-	return r, f, svc.recordAction(ctx, aProps, FunctionActionSearch, err)
+	return r, f, svc.recordAction(ctx, aProps, ApigwFunctionActionSearch, err)
 }
 
-func (svc *function) Definitions(ctx context.Context, kind string) (interface{}, error) {
-	// get the definitions from registry
-	return apigw.Service().Funcs(kind), nil
+func (svc *apigwFunction) Definitions(ctx context.Context, kind string) (l interface{}, err error) {
+	var (
+		qProps = &apigwFunctionActionProps{}
+	)
+
+	err = func() error {
+		if !svc.ac.CanSearchApiGwFunctions(ctx) {
+			return ApigwFunctionErrNotAllowedToRead(qProps)
+		}
+
+		// get the definitions from registry
+		l = apigw.Service().Funcs(kind)
+
+		return nil
+	}()
+
+	return l, svc.recordAction(ctx, qProps, ApigwFunctionActionSearch, err)
+
 }

@@ -16,6 +16,7 @@ package resource
 // - compose.page.yaml
 // - compose.record.yaml
 // - compose.yaml
+// - system.apigw-function.yaml
 // - system.apigw-route.yaml
 // - system.application.yaml
 // - system.auth-client.yaml
@@ -169,6 +170,16 @@ func ParseRule(res string) (string, *Ref, []*Ref, error) {
 
 		// Component resource, no path
 		return composeTypes.ComponentResourceType, nil, nil, nil
+	case systemTypes.ApigwFunctionResourceType:
+		if len(path) != 1 {
+			return "", nil, nil, fmt.Errorf("expecting 1 reference components in path, got %d", len(path))
+		}
+		ref, pp, err := SystemApigwFunctionRbacReferences(
+			// apigwFunction
+			path[0],
+		)
+		return systemTypes.ApigwFunctionResourceType, ref, pp, err
+
 	case systemTypes.ApigwRouteResourceType:
 		if len(path) != 1 {
 			return "", nil, nil, fmt.Errorf("expecting 1 reference components in path, got %d", len(path))

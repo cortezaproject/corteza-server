@@ -1,7 +1,7 @@
 # List of loggable service actions
 
 resource: system:function
-service: function
+service: apigwFunction
 
 # Default sensitivity for actions
 defaultActionSeverity: notice
@@ -59,3 +59,23 @@ errors:
   - error: invalidRoute
     message: "invalid route"
     severity: warning
+
+  - error: notAllowedToCreate
+    message: "not allowed to create a function"
+    log: "failed to create a route; insufficient permissions"
+
+  - error: notAllowedToRead
+    message: "not allowed to read this function"
+    log: "failed to read {function}; insufficient permissions"
+
+  - error: notAllowedToUpdate
+    message: "not allowed to update this function"
+    log: "failed to update {function}; insufficient permissions"
+
+  - error: notAllowedToDelete
+    message: "not allowed to delete this function"
+    log: "failed to delete {function}; insufficient permissions"
+
+  - error: notAllowedToUndelete
+    message: "not allowed to undelete this function"
+    log: "failed to undelete {function}; insufficient permissions"

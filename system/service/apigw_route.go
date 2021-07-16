@@ -6,66 +6,77 @@ import (
 	"github.com/cortezaproject/corteza-server/pkg/actionlog"
 	"github.com/cortezaproject/corteza-server/pkg/apigw"
 	a "github.com/cortezaproject/corteza-server/pkg/auth"
+
 	"github.com/cortezaproject/corteza-server/store"
 	"github.com/cortezaproject/corteza-server/system/types"
 )
 
 type (
-	route struct {
+	apigwRoute struct {
 		actionlog actionlog.Recorder
 		store     store.Storer
 		ac        routeAccessController
 	}
 
 	routeAccessController interface {
+		CanGrant(context.Context) bool
+		CanSearchApiGwRoutes(ctx context.Context) bool
+
+		CanCreateApiGwRoute(context.Context) bool
+		CanReadApigwRoute(context.Context, *types.ApigwRoute) bool
+		CanUpdateApigwRoute(context.Context, *types.ApigwRoute) bool
+		CanDeleteApigwRoute(context.Context, *types.ApigwRoute) bool
 	}
 )
 
-func Route() *route {
-	return (&route{
+func Route() *apigwRoute {
+	return (&apigwRoute{
 		ac:        DefaultAccessControl,
 		actionlog: DefaultActionlog,
 		store:     DefaultStore,
 	})
 }
 
-func (svc *route) FindByID(ctx context.Context, ID uint64) (q *types.ApigwRoute, err error) {
+func (svc *apigwRoute) FindByID(ctx context.Context, ID uint64) (q *types.ApigwRoute, err error) {
 	var (
-		rProps = &routeActionProps{}
+		rProps = &apigwRouteActionProps{}
 	)
 
 	err = func() error {
 		if ID == 0 {
-			return RouteErrInvalidID()
+			return ApigwRouteErrInvalidID()
+		}
+
+		if !svc.ac.CanSearchApiGwRoutes(ctx) {
+			return ApigwRouteErrNotAllowedToRead(rProps)
 		}
 
 		if q, err = store.LookupApigwRouteByID(ctx, svc.store, ID); err != nil {
-			return RouteErrInvalidID().Wrap(err)
+			return ApigwRouteErrInvalidID().Wrap(err)
 		}
 
 		rProps.setRoute(q)
 
-		// if !svc.ac.CanReadMessagebusQueue(ctx, q) {
-		// 	return QueueErrNotAllowedToRead(qProps)
-		// }
+		if !svc.ac.CanReadApigwRoute(ctx, q) {
+			return ApigwRouteErrNotAllowedToRead(rProps)
+		}
 
 		return nil
 	}()
 
-	return q, svc.recordAction(ctx, rProps, RouteActionLookup, err)
+	return q, svc.recordAction(ctx, rProps, ApigwRouteActionLookup, err)
 }
 
-func (svc *route) Create(ctx context.Context, new *types.ApigwRoute) (q *types.ApigwRoute, err error) {
+func (svc *apigwRoute) Create(ctx context.Context, new *types.ApigwRoute) (q *types.ApigwRoute, err error) {
 	var (
-		qProps = &routeActionProps{new: new}
+		qProps = &apigwRouteActionProps{new: new}
 	)
 
 	err = func() (err error) {
-		// if !svc.ac.CanCreateMessagebusQueue(ctx) {
-		// 	return QueueErrNotAllowedToCreate(qProps)
-		// }
+		if !svc.ac.CanCreateApiGwRoute(ctx) {
+			return ApigwRouteErrNotAllowedToCreate(qProps)
+		}
 
-		// Set new values after beforeCreate events are emitted
 		new.ID = nextID()
 		new.CreatedAt = *now()
 		new.CreatedBy = a.GetIdentityFromContext(ctx).Identity()
@@ -87,31 +98,30 @@ func (svc *route) Create(ctx context.Context, new *types.ApigwRoute) (q *types.A
 		return nil
 	}()
 
-	return q, svc.recordAction(ctx, qProps, RouteActionCreate, err)
+	return q, svc.recordAction(ctx, qProps, ApigwRouteActionCreate, err)
 }
 
-func (svc *route) Update(ctx context.Context, upd *types.ApigwRoute) (q *types.ApigwRoute, err error) {
+func (svc *apigwRoute) Update(ctx context.Context, upd *types.ApigwRoute) (q *types.ApigwRoute, err error) {
 	var (
-		qProps = &routeActionProps{update: upd}
+		qProps = &apigwRouteActionProps{update: upd}
 		qq     *types.ApigwRoute
 		e      error
 	)
 
 	err = func() (err error) {
-		// if !svc.ac.CanUpdateMessagebusQueue(ctx, upd) {
-		// 	return QueueErrNotAllowedToUpdate(qProps)
-		// }
+		if !svc.ac.CanUpdateApigwRoute(ctx, upd) {
+			return ApigwRouteErrNotAllowedToUpdate(qProps)
+		}
 
 		if qq, e = store.LookupApigwRouteByID(ctx, svc.store, upd.ID); e != nil {
-			return RouteErrNotFound(qProps)
+			return ApigwRouteErrNotFound(qProps)
 		}
 
 		// temp todo - update itself with the same endpoint
 		// if qq, e = store.LookupApigwRouteByEndpoint(ctx, svc.store, upd.Endpoint); e == nil && qq == nil {
-		// 	return RouteErrExistsEndpoint(qProps)
+		// 	return ApigwRouteErrExistsEndpoint(qProps)
 		// }
 
-		// Set new values after beforeCreate events are emitted
 		upd.UpdatedAt = now()
 		upd.CreatedAt = qq.CreatedAt
 		upd.UpdatedBy = a.GetIdentityFromContext(ctx).Identity()
@@ -128,18 +138,22 @@ func (svc *route) Update(ctx context.Context, upd *types.ApigwRoute) (q *types.A
 		return nil
 	}()
 
-	return q, svc.recordAction(ctx, qProps, RouteActionUpdate, err)
+	return q, svc.recordAction(ctx, qProps, ApigwRouteActionUpdate, err)
 }
 
-func (svc *route) DeleteByID(ctx context.Context, ID uint64) (err error) {
+func (svc *apigwRoute) DeleteByID(ctx context.Context, ID uint64) (err error) {
 	var (
-		qProps = &routeActionProps{}
+		qProps = &apigwRouteActionProps{}
 		q      *types.ApigwRoute
 	)
 
 	err = func() (err error) {
 		if ID == 0 {
-			return RouteErrInvalidID()
+			return ApigwRouteErrInvalidID()
+		}
+
+		if !svc.ac.CanDeleteApigwRoute(ctx, q) {
+			return ApigwRouteErrNotAllowedToDelete(qProps)
 		}
 
 		if q, err = store.LookupApigwRouteByID(ctx, svc.store, ID); err != nil {
@@ -147,10 +161,6 @@ func (svc *route) DeleteByID(ctx context.Context, ID uint64) (err error) {
 		}
 
 		qProps.setRoute(q)
-
-		// if !svc.ac.CanDeleteMessagebusQueue(ctx, q) {
-		// 	return QueueErrNotAllowedToDelete(qProps)
-		// }
 
 		q.DeletedAt = now()
 		q.DeletedBy = a.GetIdentityFromContext(ctx).Identity()
@@ -165,18 +175,22 @@ func (svc *route) DeleteByID(ctx context.Context, ID uint64) (err error) {
 		return nil
 	}()
 
-	return svc.recordAction(ctx, qProps, RouteActionDelete, err)
+	return svc.recordAction(ctx, qProps, ApigwRouteActionDelete, err)
 }
 
-func (svc *route) UndeleteByID(ctx context.Context, ID uint64) (err error) {
+func (svc *apigwRoute) UndeleteByID(ctx context.Context, ID uint64) (err error) {
 	var (
-		qProps = &routeActionProps{}
+		qProps = &apigwRouteActionProps{}
 		q      *types.ApigwRoute
 	)
 
 	err = func() (err error) {
 		if ID == 0 {
-			return RouteErrInvalidID()
+			return ApigwRouteErrInvalidID()
+		}
+
+		if !svc.ac.CanDeleteApigwRoute(ctx, q) {
+			return ApigwRouteErrNotAllowedToDelete(qProps)
 		}
 
 		if q, err = store.LookupApigwRouteByID(ctx, svc.store, ID); err != nil {
@@ -184,10 +198,6 @@ func (svc *route) UndeleteByID(ctx context.Context, ID uint64) (err error) {
 		}
 
 		qProps.setRoute(q)
-
-		// if !svc.ac.CanDeleteMessagebusQueue(ctx, q) {
-		// 	return QueueErrNotAllowedToDelete(qProps)
-		// }
 
 		q.DeletedAt = nil
 		q.UpdatedBy = a.GetIdentityFromContext(ctx).Identity()
@@ -202,22 +212,22 @@ func (svc *route) UndeleteByID(ctx context.Context, ID uint64) (err error) {
 		return nil
 	}()
 
-	return svc.recordAction(ctx, qProps, RouteActionDelete, err)
+	return svc.recordAction(ctx, qProps, ApigwRouteActionDelete, err)
 }
 
-func (svc *route) Search(ctx context.Context, filter types.ApigwRouteFilter) (r types.ApigwRouteSet, f types.ApigwRouteFilter, err error) {
+func (svc *apigwRoute) Search(ctx context.Context, filter types.ApigwRouteFilter) (r types.ApigwRouteSet, f types.ApigwRouteFilter, err error) {
 	var (
-		aProps = &routeActionProps{search: &filter}
+		aProps = &apigwRouteActionProps{search: &filter}
 	)
 
 	// For each fetched item, store backend will check if it is valid or not
-	// filter.Check = func(res *messagebus.QueueSettings) (bool, error) {
-	// 	if !svc.ac.CanReadMessagebusQueue(ctx, res) {
-	// 		return false, nil
-	// 	}
+	filter.Check = func(res *types.ApigwRoute) (bool, error) {
+		if !svc.ac.CanReadApigwRoute(ctx, res) {
+			return false, nil
+		}
 
-	// 	return true, nil
-	// }
+		return true, nil
+	}
 
 	err = func() error {
 		if r, f, err = store.SearchApigwRoutes(ctx, svc.store, filter); err != nil {
@@ -227,5 +237,5 @@ func (svc *route) Search(ctx context.Context, filter types.ApigwRouteFilter) (r 
 		return nil
 	}()
 
-	return r, f, svc.recordAction(ctx, aProps, RouteActionSearch, err)
+	return r, f, svc.recordAction(ctx, aProps, ApigwRouteActionSearch, err)
 }

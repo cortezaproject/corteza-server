@@ -40,7 +40,7 @@ type (
 		// modify the resource and return false if store should not return it
 		//
 		// Store then loads additional resources to satisfy the paging parameters
-		Check func(*ApigwRoute) (bool, error) `json:"-"`
+		Check func(*ApigwFunction) (bool, error) `json:"-"`
 
 		filter.Sorting
 		filter.Paging
